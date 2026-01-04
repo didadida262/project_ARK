@@ -20,10 +20,12 @@ class TranslationService:
         翻译文本到目标语言（默认中文）
         """
         try:
+            # googletrans使用语言代码，中文是'zh'或'zh-cn'
+            target_lang = 'zh-cn' if self.target_language == 'zh' else self.target_language
             if source_language:
-                result = self.translator.translate(text, src=source_language, dest=self.target_language)
+                result = self.translator.translate(text, src=source_language, dest=target_lang)
             else:
-                result = self.translator.translate(text, dest=self.target_language)
+                result = self.translator.translate(text, dest=target_lang)
             return result.text
         except Exception as e:
             print(f"Translation error: {e}")
