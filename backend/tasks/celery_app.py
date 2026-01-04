@@ -17,5 +17,10 @@ celery_app.conf.update(
     result_serializer='json',
     timezone='UTC',
     enable_utc=True,
+    # 自动发现任务
+    imports=('tasks.tasks',),
 )
+
+# 确保任务模块被导入
+from tasks import tasks  # noqa
 
