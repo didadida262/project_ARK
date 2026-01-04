@@ -1,80 +1,61 @@
 # 快速启动指南
 
-## 1. 安装依赖
+## 前置要求
+- Python 3.9+
+- Node.js 18+
+- Redis
 
-### 后端
+## 一键安装
+
 ```bash
+# 1. 安装后端依赖
 cd backend
 python3 -m venv venv
-source venv/bin/activate  # Windows: venv\Scripts\activate
-pip install -r requirements.txt
-```
-
-### 前端
-```bash
-cd frontend
-npm install
-```
-
-## 2. 启动服务
-
-### 启动Redis（必需）
-
-如果未安装 Redis，使用 Homebrew 安装：
-```bash
-brew install redis
-```
-
-启动 Redis：
-```bash
-brew services start redis
-# 或者直接运行（不设置为服务）：
-# redis-server
-```
-
-验证 Redis 是否运行：
-```bash
-redis-cli ping
-# 应该返回 PONG
-```
-
-### 启动Celery Worker（新终端窗口）
-```bash
-cd backend
 source venv/bin/activate
+pip install -r requirements.txt
+
+# 2. 安装前端依赖
+cd ../frontend
+npm install
+
+# 3. 安装并启动Redis（macOS）
+brew install redis && brew services start redis
+```
+
+## 启动服务（需要3个终端窗口）
+
+### 终端1：Celery Worker
+```bash
+cd backend && source venv/bin/activate
 celery -A tasks.celery_app worker --loglevel=info
 ```
 
-### 启动后端API（新终端窗口）
+### 终端2：后端API
 ```bash
-cd backend
-source venv/bin/activate
+cd backend && source venv/bin/activate
 uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
-### 启动前端（新终端窗口）
+### 终端3：前端
 ```bash
-cd frontend
-npm run dev
+cd frontend && npm run dev
 ```
 
-## 3. 访问应用
+## 访问
 
-- 前端：http://localhost:5173
-- 后端API文档：http://localhost:8000/docs
+- **前端应用**：http://localhost:5173
+- **API文档**：http://localhost:8000/docs
 
-## 4. 使用示例
+## 使用
 
-1. 打开浏览器访问前端地址
-2. 输入新闻网站URL，例如：`https://www.reuters.com`
-3. 点击"开始"按钮
-4. 等待任务完成（爬取 → 翻译 → 生成音频）
-5. 查看文章列表并下载内容
+1. 访问前端页面
+2. 输入新闻网站URL（如：`https://www.reuters.com`）
+3. 点击"开始"，等待处理完成
+4. 查看文章和下载内容
 
-## 注意事项
+## 提示
 
-- 确保Redis服务正在运行
-- 首次运行会自动创建数据库
-- 翻译和TTS需要网络连接
-- 音频文件存储在 `backend/storage/audio/` 目录
+- 确保Redis运行：`redis-cli ping`（应返回PONG）
+- 首次运行自动创建数据库
+- 需要网络连接（翻译和TTS服务）
 

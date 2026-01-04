@@ -53,7 +53,8 @@ async def create_task(task: schemas.TaskCreate, db: Session = Depends(get_db)):
     # 异步执行爬取任务
     crawl_articles_task.delay(db_task.id, task.url)
     
-    return db_task
+    # 转换字段名从id到task_id
+    return schemas.TaskResponse.from_orm(db_task)
 
 
 @app.get("/api/tasks/{task_id}", response_model=schemas.TaskResponse)
@@ -62,7 +63,7 @@ async def get_task(task_id: str, db: Session = Depends(get_db)):
     task = db.query(models.Task).filter(models.Task.id == task_id).first()
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
-    return task
+    return schemas.TaskResponse.from_orm(task)
 
 
 @app.get("/api/tasks", response_model=schemas.TaskListResponse)
@@ -71,7 +72,7 @@ async def get_tasks(skip: int = 0, limit: int = 20, db: Session = Depends(get_db
     tasks = db.query(models.Task).offset(skip).limit(limit).all()
     total = db.query(models.Task).count()
     return {
-        "tasks": tasks,
+        "tasks": [schemas.TaskResponse.from_orm(t) for t in tasks],
         "total": total,
         "page": skip // limit + 1,
         "page_size": limit

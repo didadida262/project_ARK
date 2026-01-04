@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field, field_validator
 from typing import Optional, List
 from datetime import datetime
 
@@ -15,6 +15,19 @@ class TaskResponse(BaseModel):
     created_at: datetime
     updated_at: Optional[datetime] = None
     error_message: Optional[str] = None
+    
+    @classmethod
+    def from_orm(cls, obj):
+        """从ORM对象创建响应对象"""
+        return cls(
+            task_id=obj.id,
+            url=obj.url,
+            status=obj.status,
+            articles_count=obj.articles_count,
+            created_at=obj.created_at,
+            updated_at=obj.updated_at,
+            error_message=obj.error_message
+        )
     
     class Config:
         from_attributes = True
