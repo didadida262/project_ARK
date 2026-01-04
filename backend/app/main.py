@@ -14,7 +14,7 @@ sys.path.insert(0, backend_dir)
 from app.database import get_db, engine, Base
 from app import models, schemas
 from tasks.celery_app import celery_app
-from tasks.tasks import crawl_articles_task
+from tasks.tasks import crawl_articles_task, process_text_task
 
 # 创建数据库表
 Base.metadata.create_all(bind=engine)
@@ -45,13 +45,27 @@ async def root():
 @app.post("/api/tasks", response_model=schemas.TaskResponse)
 async def create_task(task: schemas.TaskCreate, db: Session = Depends(get_db)):
     """创建新任务"""
-    db_task = models.Task(url=task.url, status="pending")
-    db.add(db_task)
-    db.commit()
-    db.refresh(db_task)
-    
-    # 异步执行爬取任务
-    crawl_articles_task.delay(db_task.id, task.url)
+    if task.mode == "url":
+        if not task.url:
+            raise HTTPException(status_code=400, detail="URL is required for url mode")
+        db_task = models.Task(url=task.url, status="pending")
+        db.add(db_task)
+        db.commit()
+        db.refresh(db_task)
+        
+        # 异步执行爬取任务
+        crawl_articles_task.delay(db_task.id, task.url)
+    else:  # text mode
+        if not task.content:
+            raise HTTPException(status_code=400, detail="Content is required for text mode")
+        # 为文本模式创建任务，URL字段存储模式标识
+        db_task = models.Task(url="text_input", status="pending")
+        db.add(db_task)
+        db.commit()
+        db.refresh(db_task)
+        
+        # 异步执行文本处理任务
+        process_text_task.delay(db_task.id, task.title or "Untitled", task.content)
     
     # 转换字段名从id到task_id
     return schemas.TaskResponse.from_orm(db_task)

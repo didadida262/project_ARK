@@ -1,10 +1,13 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { createTask, getTasks } from '../api/tasks';
+import { createTask, createTextTask, getTasks } from '../api/tasks';
 
 function Home() {
+  const [mode, setMode] = useState('url'); // 'url' or 'text'
   const [url, setUrl] = useState('');
+  const [title, setTitle] = useState('');
+  const [content, setContent] = useState('');
   const [loading, setLoading] = useState(false);
   const [recentTasks, setRecentTasks] = useState([]);
   const navigate = useNavigate();
@@ -24,11 +27,21 @@ function Home() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!url.trim()) return;
+    
+    if (mode === 'url') {
+      if (!url.trim()) return;
+    } else {
+      if (!content.trim()) return;
+    }
 
     setLoading(true);
     try {
-      const task = await createTask(url);
+      let task;
+      if (mode === 'url') {
+        task = await createTask(url);
+      } else {
+        task = await createTextTask(title || 'Untitled', content);
+      }
       navigate(`/tasks/${task.task_id}`);
     } catch (error) {
       alert('创建任务失败: ' + (error.response?.data?.detail || error.message));
@@ -59,28 +72,86 @@ function Home() {
         <h1 className="text-5xl font-bold text-white text-center mb-4">
           新闻转换平台
         </h1>
-        <p className="text-gray-400 text-center mb-12">
-          输入新闻网站URL，自动爬取、翻译并转换为音频
+        <p className="text-gray-400 text-center mb-8">
+          自动翻译并转换为音频
         </p>
 
-        <form onSubmit={handleSubmit} className="mb-16">
-          <div className="flex gap-4">
-            <input
-              type="url"
-              value={url}
-              onChange={(e) => setUrl(e.target.value)}
-              placeholder="输入新闻网站URL，例如: https://www.reuters.com"
-              className="flex-1 px-6 py-4 bg-gray-800 text-white rounded-lg border border-gray-700 focus:outline-none focus:border-blue-500"
-              disabled={loading}
-            />
+        {/* 模式切换 */}
+        <div className="flex justify-center mb-8">
+          <div className="inline-flex bg-gray-800 rounded-lg p-1 border border-gray-700">
             <button
-              type="submit"
-              disabled={loading || !url.trim()}
-              className="px-8 py-4 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              type="button"
+              onClick={() => setMode('url')}
+              className={`px-6 py-2 rounded-md transition-colors ${
+                mode === 'url'
+                  ? 'bg-blue-600 text-white'
+                  : 'text-gray-400 hover:text-white'
+              }`}
             >
-              {loading ? '处理中...' : '开始'}
+              网址模式
+            </button>
+            <button
+              type="button"
+              onClick={() => setMode('text')}
+              className={`px-6 py-2 rounded-md transition-colors ${
+                mode === 'text'
+                  ? 'bg-blue-600 text-white'
+                  : 'text-gray-400 hover:text-white'
+              }`}
+            >
+              文本模式
             </button>
           </div>
+        </div>
+
+        <form onSubmit={handleSubmit} className="mb-16">
+          {mode === 'url' ? (
+            <div className="flex gap-4">
+              <input
+                type="url"
+                value={url}
+                onChange={(e) => setUrl(e.target.value)}
+                placeholder="输入新闻网站URL，例如: https://www.reuters.com"
+                className="flex-1 px-6 py-4 bg-gray-800 text-white rounded-lg border border-gray-700 focus:outline-none focus:border-blue-500"
+                disabled={loading}
+              />
+              <button
+                type="submit"
+                disabled={loading || !url.trim()}
+                className="px-8 py-4 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              >
+                {loading ? '处理中...' : '开始'}
+              </button>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <input
+                type="text"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                placeholder="文章标题（可选）"
+                className="w-full px-6 py-4 bg-gray-800 text-white rounded-lg border border-gray-700 focus:outline-none focus:border-blue-500"
+                disabled={loading}
+              />
+              <textarea
+                value={content}
+                onChange={(e) => setContent(e.target.value)}
+                placeholder="输入文章内容..."
+                rows={10}
+                className="w-full px-6 py-4 bg-gray-800 text-white rounded-lg border border-gray-700 focus:outline-none focus:border-blue-500 resize-none"
+                disabled={loading}
+              />
+              <div className="flex justify-end">
+                <button
+                  type="submit"
+                  disabled={loading || !content.trim()}
+                  className="px-8 py-4 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
+                  {loading ? '处理中...' : '开始处理'}
+                </button>
+              </div>
+            </div>
+          )}
         </form>
 
         {recentTasks.length > 0 && (
@@ -97,7 +168,9 @@ function Home() {
                 >
                   <div className="flex items-center justify-between">
                     <div className="flex-1">
-                      <p className="text-white font-medium truncate">{task.url}</p>
+                      <p className="text-white font-medium truncate">
+                        {task.url === 'text_input' ? '文本输入' : task.url}
+                      </p>
                       <p className="text-gray-400 text-sm mt-1">
                         {new Date(task.created_at).toLocaleString()}
                       </p>

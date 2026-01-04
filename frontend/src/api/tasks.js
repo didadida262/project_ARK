@@ -1,7 +1,16 @@
 import client from './client';
 
 export const createTask = async (url) => {
-  const response = await client.post('/api/tasks', { url });
+  const response = await client.post('/api/tasks', { url, mode: 'url' });
+  return response.data;
+};
+
+export const createTextTask = async (title, content) => {
+  const response = await client.post('/api/tasks', { 
+    title, 
+    content, 
+    mode: 'text' 
+  });
   return response.data;
 };
 

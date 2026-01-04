@@ -4,7 +4,16 @@ from datetime import datetime
 
 
 class TaskCreate(BaseModel):
-    url: str
+    url: Optional[str] = None
+    title: Optional[str] = None
+    content: Optional[str] = None
+    mode: str = "url"  # "url" or "text"
+    
+    @field_validator('mode')
+    def validate_mode(cls, v):
+        if v not in ['url', 'text']:
+            raise ValueError('mode must be either "url" or "text"')
+        return v
 
 
 class TaskResponse(BaseModel):
