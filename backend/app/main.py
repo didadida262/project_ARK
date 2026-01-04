@@ -14,7 +14,7 @@ sys.path.insert(0, backend_dir)
 from app.database import get_db, engine, Base
 from app import models, schemas
 from tasks.celery_app import celery_app
-from tasks.tasks import process_text_task, generate_audio_task, generate_audio_task
+from tasks.tasks import process_text_task, generate_audio_task
 
 # 创建数据库表
 Base.metadata.create_all(bind=engine)
@@ -168,44 +168,70 @@ async def download_translated(article_id: str, db: Session = Depends(get_db)):
 
 
 @app.post("/api/articles/{article_id}/generate-audio")
-async def generate_audio(article_id: str, db: Session = Depends(get_db)):
-    """生成文章音频"""
+async def generate_audio(article_id: str, text_type: str = "translated", db: Session = Depends(get_db)):
+    """生成文章音频
+    
+    Args:
+        article_id: 文章ID
+        text_type: 文本类型，'original' 或 'translated'（默认）
+    """
     article = db.query(models.Article).filter(models.Article.id == article_id).first()
     if not article:
         raise HTTPException(status_code=404, detail="Article not found")
     
-    if not article.content_cn:
+    if text_type == "translated" and not article.content_cn:
         raise HTTPException(status_code=400, detail="Translated content not available")
     
-    if article.audio_path and os.path.exists(article.audio_path):
+    if text_type == "original" and not article.content:
+        raise HTTPException(status_code=400, detail="Original content not available")
+    
+    # 检查音频是否已存在
+    if text_type == "translated" and article.audio_path and os.path.exists(article.audio_path):
         return {"message": "Audio already exists", "audio_path": article.audio_path}
+    if text_type == "original" and article.audio_path_original and os.path.exists(article.audio_path_original):
+        return {"message": "Audio already exists", "audio_path": article.audio_path_original}
     
     # 异步生成音频
-    generate_audio_task.delay(article_id)
+    generate_audio_task.delay(article_id, text_type)
     
-    return {"message": "Audio generation started"}
+    return {"message": f"Audio generation started for {text_type} text"}
 
 
 @app.get("/api/articles/{article_id}/download/audio")
-async def download_audio(article_id: str, db: Session = Depends(get_db)):
-    """下载音频"""
+async def download_audio(article_id: str, text_type: str = "translated", db: Session = Depends(get_db)):
+    """下载音频
+    
+    Args:
+        article_id: 文章ID
+        text_type: 文本类型，'original' 或 'translated'（默认）
+    """
     article = db.query(models.Article).filter(models.Article.id == article_id).first()
     if not article:
         raise HTTPException(status_code=404, detail="Article not found")
     
-    if not article.audio_path or not os.path.exists(article.audio_path):
-        raise HTTPException(status_code=404, detail="Audio file not found")
+    # 根据text_type选择音频路径
+    if text_type == "original":
+        audio_path = article.audio_path_original
+        title = article.title
+    else:
+        audio_path = article.audio_path
+        title = article.title_cn or article.title
+    
+    if not audio_path or not os.path.exists(audio_path):
+        raise HTTPException(status_code=404, detail=f"{text_type} audio file not found")
     
     # 清理文件名中的特殊字符
-    safe_filename = "".join(c for c in (article.title_cn or article.title or "article") if c.isalnum() or c in (' ', '-', '_')).rstrip()
+    safe_filename = "".join(c for c in (title or "article") if c.isalnum() or c in (' ', '-', '_')).rstrip()
     safe_filename = safe_filename[:50]  # 限制长度
     if not safe_filename:
         safe_filename = "article"
     
+    suffix = "_original" if text_type == "original" else ""
+    
     return FileResponse(
-        article.audio_path,
+        audio_path,
         media_type='audio/mpeg',
-        filename=f"{safe_filename}.mp3"
+        filename=f"{safe_filename}{suffix}.mp3"
     )
 
 

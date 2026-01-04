@@ -51,7 +51,8 @@ class ArticleResponse(BaseModel):
     source_url: str
     publish_time: Optional[datetime] = None
     author: Optional[str] = None
-    audio_path: Optional[str] = None
+    audio_path: Optional[str] = None  # 译文音频路径
+    audio_path_original: Optional[str] = None  # 原文音频路径
     status: str
     translation_progress: Optional[int] = 0
     translation_started_at: Optional[datetime] = None
@@ -76,7 +77,8 @@ class ArticleDetailResponse(BaseModel):
     source_url: str
     publish_time: Optional[datetime] = None
     author: Optional[str] = None
-    audio_path: Optional[str] = None
+    audio_path: Optional[str] = None  # 译文音频路径
+    audio_path_original: Optional[str] = None  # 原文音频路径
     status: str
     translation_progress: Optional[int] = 0
     translation_started_at: Optional[datetime] = None

@@ -32,7 +32,8 @@ class Article(Base):
     source_url = Column(String, nullable=False)
     publish_time = Column(DateTime(timezone=True), nullable=True)
     author = Column(String, nullable=True)
-    audio_path = Column(String, nullable=True)
+    audio_path = Column(String, nullable=True)  # 译文音频路径
+    audio_path_original = Column(String, nullable=True)  # 原文音频路径
     status = Column(String, default="pending")  # pending, translating, generating, completed, failed
     translation_progress = Column(Integer, default=0)  # 翻译进度 0-100
     translation_started_at = Column(DateTime(timezone=True), nullable=True)

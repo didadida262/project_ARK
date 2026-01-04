@@ -49,13 +49,16 @@ export const deleteAllTasks = async () => {
   return response.data;
 };
 
-export const generateAudio = async (articleId) => {
-  const response = await client.post(`/api/articles/${articleId}/generate-audio`);
+export const generateAudio = async (articleId, textType = 'translated') => {
+  const response = await client.post(`/api/articles/${articleId}/generate-audio`, null, {
+    params: { text_type: textType }
+  });
   return response.data;
 };
 
-export const downloadAudio = async (articleId) => {
+export const downloadAudio = async (articleId, textType = 'translated') => {
   const response = await client.get(`/api/articles/${articleId}/download/audio`, {
+    params: { text_type: textType },
     responseType: 'blob',
   });
   return response.data;
