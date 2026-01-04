@@ -50,26 +50,14 @@ def crawl_articles_task(self, task_id: str, url: str):
         articles_data = spider.crawl(url, max_articles=settings.max_articles_per_task)
         print(f"Crawled {len(articles_data)} articles")
         
-        # 如果爬取失败，生成测试数据（用于演示）
+        # 如果爬取失败，更新任务状态并返回
         if not articles_data:
-            print("No articles crawled, generating test data for demonstration")
-            articles_data = [
-                {
-                    "title": "Sample News Article 1",
-                    "content": "This is a sample news article content for demonstration purposes. " * 20,
-                    "url": f"{url}/article/1",
-                    "publish_time": None,
-                    "author": "Test Author"
-                },
-                {
-                    "title": "Sample News Article 2", 
-                    "content": "Another sample article to demonstrate the translation and audio conversion features. " * 20,
-                    "url": f"{url}/article/2",
-                    "publish_time": None,
-                    "author": "Test Author"
-                }
-            ][:settings.max_articles_per_task]
-            print(f"Generated {len(articles_data)} test articles")
+            print("No articles crawled from the website")
+            task.status = "failed"
+            task.error_message = "No articles found. The website may have anti-crawling protection or the URL is invalid."
+            task.articles_count = 0
+            db.commit()
+            return {"status": "error", "message": "No articles found"}
         
         # 保存文章到数据库
         articles = []
