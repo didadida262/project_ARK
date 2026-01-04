@@ -1,7 +1,6 @@
 from fastapi import FastAPI, Depends, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
-from fastapi.staticfiles import StaticFiles
 from sqlalchemy.orm import Session
 from typing import List
 import os
@@ -14,7 +13,7 @@ sys.path.insert(0, backend_dir)
 from app.database import get_db, engine, Base
 from app import models, schemas
 from tasks.celery_app import celery_app
-from tasks.tasks import crawl_articles_task, process_text_task
+from tasks.tasks import process_text_task
 
 # 创建数据库表
 Base.metadata.create_all(bind=engine)
@@ -30,11 +29,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# 静态文件服务（用于音频文件）
-from config import settings
-audio_storage_path = os.path.abspath(settings.audio_storage_path)
-if os.path.exists(audio_storage_path):
-    app.mount("/storage", StaticFiles(directory=audio_storage_path), name="storage")
 
 
 @app.get("/")
@@ -44,28 +38,18 @@ async def root():
 
 @app.post("/api/tasks", response_model=schemas.TaskResponse)
 async def create_task(task: schemas.TaskCreate, db: Session = Depends(get_db)):
-    """创建新任务"""
-    if task.mode == "url":
-        if not task.url:
-            raise HTTPException(status_code=400, detail="URL is required for url mode")
-        db_task = models.Task(url=task.url, status="pending")
-        db.add(db_task)
-        db.commit()
-        db.refresh(db_task)
-        
-        # 异步执行爬取任务
-        crawl_articles_task.delay(db_task.id, task.url)
-    else:  # text mode
-        if not task.content:
-            raise HTTPException(status_code=400, detail="Content is required for text mode")
-        # 为文本模式创建任务，URL字段存储模式标识
-        db_task = models.Task(url="text_input", status="pending")
-        db.add(db_task)
-        db.commit()
-        db.refresh(db_task)
-        
-        # 异步执行文本处理任务
-        process_text_task.delay(db_task.id, task.title or "Untitled", task.content)
+    """创建新任务（仅文本模式）"""
+    if not task.content:
+        raise HTTPException(status_code=400, detail="Content is required")
+    
+    # 创建任务
+    db_task = models.Task(url="text_input", status="pending")
+    db.add(db_task)
+    db.commit()
+    db.refresh(db_task)
+    
+    # 异步执行文本处理任务
+    process_text_task.delay(db_task.id, task.title or "Untitled", task.content)
     
     # 转换字段名从id到task_id
     return schemas.TaskResponse.from_orm(db_task)
@@ -97,7 +81,9 @@ async def get_tasks(skip: int = 0, limit: int = 20, db: Session = Depends(get_db
 async def get_task_articles(task_id: str, db: Session = Depends(get_db)):
     """获取任务下的文章列表"""
     articles = db.query(models.Article).filter(models.Article.task_id == task_id).all()
-    return {"articles": articles}
+    # 转换为响应模型
+    article_responses = [schemas.ArticleResponse.from_orm(article) for article in articles]
+    return {"articles": article_responses}
 
 
 @app.get("/api/articles/{article_id}", response_model=schemas.ArticleDetailResponse)
@@ -149,29 +135,6 @@ async def download_translated(article_id: str, db: Session = Depends(get_db)):
         temp_path,
         media_type='text/plain',
         filename=f"{article.title_cn or article.title}_translated.txt"
-    )
-
-
-@app.get("/api/articles/{article_id}/download/audio")
-async def download_audio(article_id: str, db: Session = Depends(get_db)):
-    """下载音频"""
-    article = db.query(models.Article).filter(models.Article.id == article_id).first()
-    if not article:
-        raise HTTPException(status_code=404, detail="Article not found")
-    
-    if not article.audio_path or not os.path.exists(article.audio_path):
-        raise HTTPException(status_code=404, detail="Audio file not found")
-    
-    # 清理文件名中的特殊字符
-    safe_filename = "".join(c for c in (article.title_cn or article.title or "article") if c.isalnum() or c in (' ', '-', '_')).rstrip()
-    safe_filename = safe_filename[:50]  # 限制长度
-    if not safe_filename:
-        safe_filename = "article"
-    
-    return FileResponse(
-        article.audio_path,
-        media_type='audio/mpeg',
-        filename=f"{safe_filename}.mp3"
     )
 
 

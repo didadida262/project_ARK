@@ -4,16 +4,8 @@ from datetime import datetime
 
 
 class TaskCreate(BaseModel):
-    url: Optional[str] = None
     title: Optional[str] = None
-    content: Optional[str] = None
-    mode: str = "url"  # "url" or "text"
-    
-    @field_validator('mode')
-    def validate_mode(cls, v):
-        if v not in ['url', 'text']:
-            raise ValueError('mode must be either "url" or "text"')
-        return v
+    content: str
 
 
 class TaskResponse(BaseModel):
@@ -61,6 +53,9 @@ class ArticleResponse(BaseModel):
     author: Optional[str] = None
     audio_path: Optional[str] = None
     status: str
+    translation_progress: Optional[int] = 0
+    translation_started_at: Optional[datetime] = None
+    translation_completed_at: Optional[datetime] = None
     created_at: datetime
     
     class Config:
@@ -83,6 +78,9 @@ class ArticleDetailResponse(BaseModel):
     author: Optional[str] = None
     audio_path: Optional[str] = None
     status: str
+    translation_progress: Optional[int] = 0
+    translation_started_at: Optional[datetime] = None
+    translation_completed_at: Optional[datetime] = None
     created_at: datetime
     
     class Config:

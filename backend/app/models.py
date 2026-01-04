@@ -34,6 +34,9 @@ class Article(Base):
     author = Column(String, nullable=True)
     audio_path = Column(String, nullable=True)
     status = Column(String, default="pending")  # pending, translating, generating, completed, failed
+    translation_progress = Column(Integer, default=0)  # 翻译进度 0-100
+    translation_started_at = Column(DateTime(timezone=True), nullable=True)
+    translation_completed_at = Column(DateTime(timezone=True), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
 

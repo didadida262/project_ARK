@@ -1,15 +1,9 @@
 import client from './client';
 
-export const createTask = async (url) => {
-  const response = await client.post('/api/tasks', { url, mode: 'url' });
-  return response.data;
-};
-
-export const createTextTask = async (title, content) => {
+export const createTask = async (title, content) => {
   const response = await client.post('/api/tasks', { 
     title, 
-    content, 
-    mode: 'text' 
+    content
   });
   return response.data;
 };
@@ -45,13 +39,6 @@ export const downloadOriginal = async (articleId) => {
 
 export const downloadTranslated = async (articleId) => {
   const response = await client.get(`/api/articles/${articleId}/download/translated`, {
-    responseType: 'blob',
-  });
-  return response.data;
-};
-
-export const downloadAudio = async (articleId) => {
-  const response = await client.get(`/api/articles/${articleId}/download/audio`, {
     responseType: 'blob',
   });
   return response.data;
