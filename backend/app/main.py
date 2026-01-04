@@ -86,6 +86,30 @@ async def get_task_articles(task_id: str, db: Session = Depends(get_db)):
     return {"articles": article_responses}
 
 
+@app.delete("/api/tasks/all")
+async def delete_all_tasks(db: Session = Depends(get_db)):
+    """清空所有任务和文章"""
+    try:
+        # 先删除所有文章（因为有外键约束）
+        articles_count = db.query(models.Article).count()
+        db.query(models.Article).delete()
+        
+        # 再删除所有任务
+        tasks_count = db.query(models.Task).count()
+        db.query(models.Task).delete()
+        
+        db.commit()
+        
+        return {
+            "message": "All tasks and articles deleted successfully",
+            "deleted_tasks": tasks_count,
+            "deleted_articles": articles_count
+        }
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Error deleting tasks: {str(e)}")
+
+
 @app.get("/api/articles/{article_id}", response_model=schemas.ArticleDetailResponse)
 async def get_article(article_id: str, db: Session = Depends(get_db)):
     """获取文章详情"""

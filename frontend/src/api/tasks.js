@@ -44,3 +44,8 @@ export const downloadTranslated = async (articleId) => {
   return response.data;
 };
 
+export const deleteAllTasks = async () => {
+  const response = await client.delete('/api/tasks/all');
+  return response.data;
+};
+
