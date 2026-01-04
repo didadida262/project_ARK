@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { getArticle, downloadOriginal, downloadTranslated, downloadAudio } from '../api/tasks';
+import AudioPlayer from '../components/AudioPlayer';
 
 function ArticleDetail() {
   const { articleId } = useParams();
@@ -126,17 +127,16 @@ function ArticleDetail() {
         </div>
 
         {article.audio_path && (
-          <div className="mb-8 p-6 bg-gray-900 rounded-lg">
-            <h3 className="text-white font-medium mb-4">音频播放</h3>
-            <audio
-              controls
-              className="w-full"
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="mb-8"
+          >
+            <AudioPlayer
               src={`${import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000'}/api/articles/${articleId}/download/audio`}
-              preload="metadata"
-            >
-              您的浏览器不支持音频播放
-            </audio>
-          </div>
+              title={article.title_cn || article.title || '音频播放'}
+            />
+          </motion.div>
         )}
 
         <div className="flex gap-4 flex-wrap">
