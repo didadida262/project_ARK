@@ -11,6 +11,7 @@ from tasks.celery_app import celery_app
 from app.database import SessionLocal
 from app import models
 from services.translation_service import translation_service
+from services.tts_service import tts_service
 from config import settings
 from datetime import datetime
 
@@ -116,6 +117,76 @@ def process_text_task(self, task_id: str, title: str, content: str):
                 db.commit()
         except:
             pass
+        return {"status": "error", "message": str(e)}
+    finally:
+        try:
+            db.close()
+        except:
+            pass
+
+
+@celery_app.task(bind=True)
+def generate_audio_task(self, article_id: str):
+    """生成音频任务"""
+    db = get_db_session()
+    try:
+        article = db.query(models.Article).filter(models.Article.id == article_id).first()
+        if not article:
+            return {"status": "error", "message": "Article not found"}
+        
+        if not article.content_cn:
+            return {"status": "error", "message": "Translated content not available"}
+        
+        # 更新文章状态为生成中
+        article.status = "generating"
+        db.commit()
+        
+        # 定义进度回调函数
+        def update_progress(progress: int):
+            """更新音频生成进度 (0-100)"""
+            try:
+                article_update = db.query(models.Article).filter(models.Article.id == article_id).first()
+                if article_update:
+                    # 使用translation_progress字段存储音频生成进度（临时）
+                    # 或者可以添加新字段，这里先复用
+                    article_update.translation_progress = progress
+                    db.commit()
+                    print(f"Audio generation progress: {progress}%")
+            except Exception as e:
+                print(f"Error updating audio progress: {e}")
+        
+        # 生成音频
+        try:
+            print(f"Starting audio generation for article {article_id}...")
+            print(f"Content length: {len(article.content_cn)} characters")
+            
+            audio_path = tts_service.text_to_speech(
+                article.content_cn, 
+                article_id, 
+                lang="zh",
+                progress_callback=update_progress
+            )
+            
+            print(f"✓ Audio generation completed: {audio_path}")
+            article.audio_path = audio_path
+            article.status = "completed"
+            article.translation_progress = 100
+            db.commit()
+            return {"status": "completed", "audio_path": audio_path}
+        except Exception as e:
+            import traceback
+            error_msg = f"{str(e)}\n{traceback.format_exc()}"
+            print(f"✗ Error generating audio for article {article_id}: {error_msg}")
+            # 即使音频生成失败，也标记为完成（因为翻译已完成）
+            article.status = "completed"
+            article.translation_progress = 0  # 重置进度
+            db.commit()
+            return {"status": "error", "message": str(e)}
+        
+    except Exception as e:
+        import traceback
+        error_msg = f"{str(e)}\n{traceback.format_exc()}"
+        print(f"Audio generation task error: {error_msg}")
         return {"status": "error", "message": str(e)}
     finally:
         try:

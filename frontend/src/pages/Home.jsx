@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { createTask, getTasks, deleteAllTasks, getTaskArticles, downloadOriginal, downloadTranslated } from '../api/tasks';
+import { createTask, getTasks, deleteAllTasks, getTaskArticles, downloadOriginal, downloadTranslated, generateAudio, downloadAudio } from '../api/tasks';
 
 function Home() {
   const [title, setTitle] = useState('');
@@ -11,11 +11,23 @@ function Home() {
   const [tasksWithArticles, setTasksWithArticles] = useState([]);
   const [clearing, setClearing] = useState(false);
   const [downloading, setDownloading] = useState({});
+  const [generatingAudio, setGeneratingAudio] = useState({});
   const navigate = useNavigate();
 
   useEffect(() => {
     loadRecentTasks();
-  }, []);
+    // 如果有正在生成音频的任务，每2秒刷新一次
+    const interval = setInterval(() => {
+      const hasGenerating = tasksWithArticles.some(task => {
+        const article = task.articles?.[0];
+        return article && article.status === 'generating';
+      });
+      if (hasGenerating) {
+        loadRecentTasks();
+      }
+    }, 2000);
+    return () => clearInterval(interval);
+  }, [tasksWithArticles.length]);
 
   const loadRecentTasks = async () => {
     try {
@@ -100,6 +112,11 @@ function Home() {
         const articlesData = await getTaskArticles(taskId);
         const article = articlesData.articles?.find(a => a.id === articleId);
         filename = `${article?.title_cn || article?.title || 'article'}_translated.txt`;
+      } else if (type === 'audio') {
+        blob = await downloadAudio(articleId);
+        const articlesData = await getTaskArticles(taskId);
+        const article = articlesData.articles?.find(a => a.id === articleId);
+        filename = `${article?.title_cn || article?.title || 'article'}.mp3`;
       }
 
       const url = window.URL.createObjectURL(blob);
@@ -114,6 +131,19 @@ function Home() {
       alert('下载失败: ' + (error.response?.data?.detail || error.message));
     } finally {
       setDownloading({ ...downloading, [key]: false });
+    }
+  };
+
+  const handleGenerateAudio = async (taskId, articleId) => {
+    const key = `${taskId}-${articleId}`;
+    setGeneratingAudio({ ...generatingAudio, [key]: true });
+    try {
+      await generateAudio(articleId);
+      // 刷新任务列表以更新状态
+      loadRecentTasks();
+    } catch (error) {
+      alert('生成音频失败: ' + (error.response?.data?.detail || error.message));
+      setGeneratingAudio({ ...generatingAudio, [key]: false });
     }
   };
 
@@ -211,6 +241,20 @@ function Home() {
                           </span>
                         )}
                       </div>
+                      {article && article.status === 'generating' && (
+                        <div className="mt-2">
+                          <div className="flex items-center justify-between mb-1">
+                            <span className="text-purple-400 text-xs">音频生成进度</span>
+                            <span className="text-purple-400 text-xs">{article.translation_progress || 0}%</span>
+                          </div>
+                          <div className="w-full bg-gray-700 rounded-full h-1.5">
+                            <div
+                              className="bg-purple-600 h-1.5 rounded-full transition-all duration-300"
+                              style={{ width: `${article.translation_progress || 0}%` }}
+                            />
+                          </div>
+                        </div>
+                      )}
                     </div>
                       <div className="flex items-center gap-3">
                         <span className={`px-3 py-1 rounded-full text-xs font-medium ${getStatusColor(task.status)} text-white`}>
@@ -239,6 +283,31 @@ function Home() {
                               >
                                 {downloading[`${task.task_id}-${article.id}-translated`] ? '下载中...' : '下载译文'}
                               </button>
+                            )}
+                            {article.content_cn && (
+                              article.audio_path ? (
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleDownload(task.task_id, article.id, 'audio');
+                                  }}
+                                  disabled={downloading[`${task.task_id}-${article.id}-audio`]}
+                                  className="px-3 py-1.5 bg-purple-600 text-white rounded text-xs hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                                >
+                                  {downloading[`${task.task_id}-${article.id}-audio`] ? '下载中...' : '下载音频'}
+                                </button>
+                              ) : (
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleGenerateAudio(task.task_id, article.id);
+                                  }}
+                                  disabled={generatingAudio[`${task.task_id}-${article.id}`] || article.status === 'generating'}
+                                  className="px-3 py-1.5 bg-purple-600 text-white rounded text-xs hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                                >
+                                  {article.status === 'generating' ? `生成中 ${article.translation_progress || 0}%` : '生成音频'}
+                                </button>
+                              )
                             )}
                           </div>
                         )}
